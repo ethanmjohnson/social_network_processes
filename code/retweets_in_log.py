@@ -3,6 +3,7 @@ from pm4py.objects.log.obj import EventLog, Trace, Event
 import pm4py
 from pm4py.visualization.petri_net import visualizer as pn_visualizer
 from multiprocessing import Process
+import os
 
 # converts the csv file to an event log
 
@@ -41,7 +42,7 @@ def getIndexes(dfObj, value):
 
 if __name__ == '__main__':
     # read in csv file
-    data = pd.read_csv('/Users/ethanjohnson/Library/CloudStorage/Box-Box/MPhil/raw/anna_data/Apr 2020/Honduras/honduras_022020_tweets_csv_hashed.csv')
+    data = pd.read_csv(os.getcwd()+'/raw_data/Apr 2020/Honduras/honduras_022020_tweets_csv_hashed.csv')
 
 
 
@@ -79,7 +80,7 @@ if __name__ == '__main__':
     log = EventLog()
 
 
-    for j in range(100000):
+    for j in range(2):
         
         trace = Trace()
         i = 0
@@ -94,7 +95,7 @@ if __name__ == '__main__':
     eventlog = pm4py.convert_to_event_log(log)
     eventlog = pm4py.filter_case_size(eventlog, 2, 2**50)
 
-    pm4py.write_xes(eventlog, '/Users/ethanjohnson/Library/CloudStorage/Box-Box/MPhil/data/hondurasData.xes')
+    pm4py.write_xes(eventlog, os.getcwd()+'/processed_data/honduras_log.xes')
 
 
 

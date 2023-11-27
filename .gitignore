@@ -1,9 +1,11 @@
 Pipfile
 .DS_Store
 helpful_commands.txt
-.csv
-.xlsx
-.zip
+*.csv
+*.xlsx
+*.zip
 raw_data
 processed_data
 figs
+Pipfile.lock
+*.xes

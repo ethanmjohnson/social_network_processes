@@ -7,11 +7,10 @@ import os
 
 # simulates an event log from a real event log
 
-#directory = os.path.dirname()
 
 print("Reading event log...")
 
-file = '/Users/ethanjohnson/Library/CloudStorage/Box-Box/MPhil/data/adjusted_event_log.xes'
+file = os.getcwd()+'/processed_data/honduras_log.xes'
 
 variant = xes_importer.Variants.ITERPARSE
 parameters = {variant.value.Parameters.TIMESTAMP_SORT: True}
@@ -30,14 +29,14 @@ n = int(len(eventlog)/100)
 
 # 
 
-sim_trace = monte.algorithm.apply(eventlog, net, im, fm, parameters={"num_simulations": 10000, "parallelization": True, "max_thread_execution_time": 3600})[0]
+sim_trace = monte.algorithm.apply(eventlog, net, im, fm, parameters={"num_simulations": 1, "parallelization": True, "max_thread_execution_time": 3600})[0]
 simulated_log = pm4py.convert_to_event_log(sim_trace)
 
 print(len(simulated_log))
 
 print("Writing...")
 
-#pm4py.write_xes(simulated_log, '/Users/ethanjohnson/Library/CloudStorage/Box-Box/MPhil/data/simulated_hondurasData.xes')
+pm4py.write_xes(simulated_log, os.getcwd()+'/processed_data/simulated_honduras_log.xes')
 
 print("Done")
 
