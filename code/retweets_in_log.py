@@ -1,55 +1,17 @@
 import pandas as pd
 from pm4py.objects.log.obj import EventLog, Trace, Event
 import pm4py
-from pm4py.visualization.petri_net import visualizer as pn_visualizer
-from multiprocessing import Process
 import os
 
-# converts the csv file to an event log
+# this code takes a .csv file and converts the data to an event log using each unique post as the case id
 
-
-def getIndexes(dfObj, value):
-     
-    # Empty list
-    listOfPos = []
-     
-    # isin() method will return a dataframe with
-    # boolean values, True at the positions   
-    # where element exists
-    result = dfObj.isin([value])
-     
-    # any() method will return
-    # a boolean series
-    seriesObj = result.any()
- 
-    # Get list of column names where
-    # element exists
-    columnNames = list(seriesObj[seriesObj == True].index)
-    
-    # Iterate over the list of columns and
-    # extract the row index where element exists
-    for col in columnNames:
-        rows = list(result[col][result[col] == True].index)
- 
-        for row in rows:
-            listOfPos.append((row, col))
-             
-    # This list contains a list tuples with
-    # the index of element in the dataframe
-    return listOfPos
-
-
-
-if __name__ == '__main__':
-    # read in csv file
-    data = pd.read_csv(os.getcwd()+'/raw_data/Apr 2020/Honduras/honduras_022020_tweets_csv_hashed.csv')
-
-
+def csv_to_eventlog(data):
 
     df = []
 
-    # select important colmns from csv
     df = data.loc[:, ['tweet_time', 'userid', 'retweet_tweetid']]
+
+    print(len(df))
 
     df['tweet_time'] = pd.to_datetime(df['tweet_time'])
 
@@ -59,70 +21,37 @@ if __name__ == '__main__':
 
     df.sort_values(by = 'tweet_time', ascending=True, inplace=True)
     df = df[df['retweet_tweetid'].isnull() == False]
+    df = df[df['userid'].isnull() == False]
+
+
     df = df.loc[df.duplicated(subset='retweet_tweetid', keep=False), :]
     df.reset_index(drop=True, inplace = True)
 
 
+    rt_id = df['retweet_tweetid'].unique()
 
 
-
-    uniqueNames = df.drop_duplicates(subset= 'retweet_tweetid', keep = 'first')
-    uniqueNames = uniqueNames.loc[:, ['retweet_tweetid']]
-
-
-
-    uniqueNames = uniqueNames[uniqueNames['retweet_tweetid'].isnull() == False]
-    uniqueNames.reset_index(drop=True, inplace=True)
-
-
-    # 233977 - length of uniquenames
 
     log = EventLog()
 
 
-    for j in range(2):
-        
+
+    for id in rt_id:
         trace = Trace()
-        i = 0
-        ind = getIndexes(df, uniqueNames.at[j, 'retweet_tweetid'])
-        for k in range(len(ind)):
-            event = Event({'concept:name' : df.userid[ind[k][0]] + '-retweets', 'time:timestamp' : df.tweet_time[ind[k][0]]})
+        tweet = df[df['retweet_tweetid']==id]
+        tweet = tweet.drop_duplicates(subset=['userid'], keep='first')
+        for i in range(len(tweet)):
+            event = Event({'concept:name' : tweet.iat[i,1] + '-retweets', 'time:timestamp' : tweet.iat[i,0]})
+
             trace.insert(i, event)
-            i=i+1
         log.append(trace)
 
 
     eventlog = pm4py.convert_to_event_log(log)
     eventlog = pm4py.filter_case_size(eventlog, 2, 2**50)
+    return eventlog
 
-    pm4py.write_xes(eventlog, os.getcwd()+'/processed_data/honduras_log.xes')
+data = pd.read_csv('/Users/ethanjohnson/Desktop/mphil-project/raw_data/Apr 2020/Honduras/honduras_022020_tweets_csv_hashed.csv')
 
-
-
-
-
-
-
-
-
-
-#print('Visualising... \n')
-#parameters = {pn_visualizer.Variants.PERFORMANCE.value.Parameters.FORMAT: "png"}
-#gviz = pn_visualizer.apply(net, im, fm, parameters=parameters, variant=pn_visualizer.Variants.PERFORMANCE, log=eventlog)
-
-#pn_visualizer.save(gviz, "/Users/ethanjohnson/Library/CloudStorage/Box-Box/MPhil/figs/inductive_times.png")
-
-
-
-######
-
-#simulate using log and petri net i already have
-# collect metrics for current and simulated petri net e.g. mean firing time
-# generate a histogram of these times
-
-
-
-
-# interarrival time and total events in eventlog
-
-# anna code gets transition times 
+eventlog = csv_to_eventlog(data)
+pm4py.write_xes(eventlog, '/Users/ethanjohnson/Desktop/mphil-project/processed_data/honduras_log.xes')
