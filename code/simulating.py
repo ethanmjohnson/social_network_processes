@@ -1,63 +1,74 @@
 from pm4py.objects.log.importer.xes import importer as xes_importer
 import pm4py
-import pm4py.algo.simulation.montecarlo as monte
+from pm4py.algo.simulation.montecarlo import algorithm as montecarlo_simulation
 from pm4py.objects.log.obj import EventLog, Trace, Event
 import os
+from pm4py.objects.log.util.split_train_test import split
 
 
-# simulates an event log from a real event log
-
-
-print("Reading event log...")
-
-file = os.getcwd()+'/processed_data/honduras_log.xes'
-
-variant = xes_importer.Variants.ITERPARSE
-parameters = {variant.value.Parameters.TIMESTAMP_SORT: True}
-eventlog = xes_importer.apply(file, variant=variant, parameters=parameters)
-
-simulated_log = EventLog()
-
-print('Discovering... \n')
-net, im, fm = pm4py.discover_petri_net_inductive(eventlog)
-
-print("Simulating... \n")
-
-n = int(len(eventlog)/100)
+# simulates an event log from a real event log using a montecarlo simulation
 
 
 
-# 
+def simulating(file, trainsplit):
 
-sim_trace = monte.algorithm.apply(eventlog, net, im, fm, parameters={"num_simulations": 1, "parallelization": True, "max_thread_execution_time": 3600})[0]
-simulated_log = pm4py.convert_to_event_log(sim_trace)
+    print("Reading event log...")
 
-print(len(simulated_log))
+    variant = xes_importer.Variants.ITERPARSE
+    parameters = {variant.value.Parameters.TIMESTAMP_SORT: True}
+    log = xes_importer.apply(file, variant=variant, parameters=parameters)
 
-print("Writing...")
+    train, test = split(log, trainsplit)
 
-pm4py.write_xes(simulated_log, os.getcwd()+'/processed_data/simulated_honduras_log.xes')
-
-print("Done")
-
-
+    pm4py.write_xes(train, '/Users/ethanjohnson/Desktop/mphil-project/processed_data/trainset.xes')
+    pm4py.write_xes(test, '/Users/ethanjohnson/Desktop/mphil-project/processed_data/testset.xes')
 
 
-# priority:
-# create bins of events, generate histogram from number of events in each bin.
-# increase simulation numbers
+    simulated_log = EventLog()
 
-# look at first bin for this data (t=0) suspect its because we dont have control over cases when length of trace is 1.
+    print('Discovering... \n')
+    net, im, fm = pm4py.discover_petri_net_inductive(train)
 
-# check average transition time distributions
-# try to build time distributions for other transitions in the net
-# keep one tweet analysis
-
-# take a uer filter them out of the event log - find time when previous activity occurred, 
-
-# assuem when one user retweets the user in question will also retweet. take difference in times and plot
-
-# send notes to anna and lewis
+    print("Simulating... \n")
 
 
-# 
+
+    parameters={}
+    parameters[montecarlo_simulation.Variants.PETRI_SEMAPH_FIFO.value.Parameters.PARAM_MAX_THREAD_EXECUTION_TIME] = 1000
+
+    parameters[montecarlo_simulation.Variants.PETRI_SEMAPH_FIFO.value.Parameters.PARAM_NUM_SIMULATIONS] = 2000
+
+    parameters[montecarlo_simulation.Variants.PETRI_SEMAPH_FIFO.value.Parameters.TIMESTAMP_KEY] = "time:timestamp"
+
+    parameters[montecarlo_simulation.Variants.PETRI_SEMAPH_FIFO.value.Parameters.ACTIVITY_KEY] = "concept:name"
+
+    count = 0
+    for i in range(8):
+        simlog, res = montecarlo_simulation.apply(train, net, im, fm, parameters=parameters)
+        count +=1
+        print(count)
+        for trace in simlog:
+            simulated_log.append(trace)
+
+
+    desired_start_timestamp = test[0][0]["time:timestamp"]
+    current_start_timestamp = simulated_log[0][0]["time:timestamp"]
+
+    time_difference = desired_start_timestamp - current_start_timestamp
+
+    for trace in simulated_log:
+        for event in trace:
+            event["time:timestamp"] += time_difference
+    
+    return simulated_log
+
+
+
+trainsplit = 0.66
+file = '/Users/ethanjohnson/Desktop/mphil-project/processed_data/honduras_log.xes'
+
+simulated_log = simulating(file, trainsplit)
+
+print('writing')
+
+pm4py.write_xes(simulated_log, '/Users/ethanjohnson/Desktop/mphil-project/processed_data/simtest.xes')
