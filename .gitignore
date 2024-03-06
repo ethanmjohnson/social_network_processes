@@ -9,3 +9,4 @@ processed_data
 figs
 Pipfile.lock
 *.xes
+*.png
