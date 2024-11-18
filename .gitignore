@@ -10,3 +10,5 @@ figs
 Pipfile.lock
 *.xes
 *.png
+__pycache__
+unused_code
