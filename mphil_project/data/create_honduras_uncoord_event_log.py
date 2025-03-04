@@ -61,8 +61,12 @@ def remove_single_occurrence_activities(log):
     # Filter the DataFrame to keep only the activities that occur more than once
     filtered_df = df_log[df_log['concept:name'].isin(activities_to_keep)]
 
+    # resample log to find traces of length 2 at least
+
+    length_df = filtered_df.groupby('case:concept:name').filter(lambda x: len(x) >= 2 and len(x) <= 10)
+
     # Convert the filtered DataFrame back to an event log
-    filtered_log = log_converter.apply(filtered_df, variant=log_converter.Variants.TO_EVENT_LOG)
+    filtered_log = log_converter.apply(length_df, variant=log_converter.Variants.TO_EVENT_LOG)
     
     return filtered_log
 
