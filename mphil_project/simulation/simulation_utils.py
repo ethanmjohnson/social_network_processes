@@ -5,6 +5,9 @@ import numpy as np
 import scipy.stats as stats
 import random
 import pm4py
+from pm4py.objects.log.obj import Event, EventLog, Trace
+from pm4py.algo.conformance.tokenreplay import algorithm as token_replay
+from tqdm import tqdm
 
 def choose_transition(transitions, user_distributions):
     # logic to choose an enabled transition to fire
@@ -45,42 +48,52 @@ def choose_transition(transitions, user_distributions):
 
 
 
-def find_user_retweetingTimes(log):
-    # this function finds the retweeting times of users in an event log
-    users_long = []
-    for trace in log:
-        for event in trace:
-            users_long.append(event['concept:name'])
+def initialise_user_times(net: pm4py.objects.petri_net.obj.PetriNet):
+    # initialise the dictionary containing the user retweet times
+    transition_names = [t.label for t in net.transitions if t.label is not None]
+    unique_names = list(set(transition_names))
 
-    users = np.unique(users_long)
+    times_dict = {}
 
-    # find the average time taken for each user to retweet i.e. times between each users retweet and the post
+    for name in unique_names:
+        times_dict[name] = []
+    return times_dict
 
+def find_user_retweet_times(times_dict: dict, log: EventLog, net, im, fm):
 
+    for j in tqdm(range(len(log))):
+        trace = log[j]
+        trace_log = EventLog()
+        trace_log.append(trace)
+        # replay to find if trace is in petri net
+        fitness = token_replay.apply(trace_log, net, im, fm)
+
+        if fitness[0]['trace_fitness'] == 1.0:
+            # find the difference in times from event log if the trace exists in petri net
+            for i in range(1, len(trace)):
+                times_dict[trace[i]['concept:name']].append((trace[i]['time:timestamp'] - trace[i-1]['time:timestamp']).total_seconds())
+    
+    return times_dict
+
+def find_user_retweet_dist(times_dict: dict):
     user_distributions = {}
 
-    df_log = pm4py.convert_to_dataframe(log)
-    df = df_log.sort_values(by='time:timestamp')
-
-    for user in users:
-
-        subset_df = df[df['concept:name'] == user]
-
-        times = list(subset_df['time:timestamp'])
-
-        time_differences = [times[i] - times[i - 1] for i in range(1, len(times))]
+    for key in times_dict.keys():
+        times = times_dict[key]
 
         if len(times) >= 30:
-            user_time = best_fitting_distribution(time_differences)
-            
+            user_time = best_fitting_distribution(times)
+
+        elif len(times) > 1:
+            average_time = np.mean(times)
+
+            user_time = lambda: stats.uniform.rvs(loc=0, scale = 2*average_time)
+        elif len(times) == 1:
+            user_time = lambda: stats.uniform.rvs(loc = 0, scale = 2*times[0])
         else:
-            average_time = np.mean([td.total_seconds() for td in time_differences])  # Convert Timedelta to seconds
-            average_time = average_time / 3600 
-
-            user_time = lambda: np.random.uniform(0, 2*average_time)
-            
-
-        user_distributions[user] = user_time
+            user_time = lambda: stats.uniform.rvs(loc = 0,scale = 0)
+        
+        user_distributions[key] = user_time
     # set silent transitions to a high number so they never fire unless only enabled transition
     # this is why your code is taking 1000000 years in simulation time
     user_distributions[None] = lambda: np.random.uniform(1000000, 1000001)
@@ -92,7 +105,7 @@ def find_user_retweetingTimes(log):
 
 def best_fitting_distribution(time_differences):
     # Convert time data (Timedelta) to hours
-    data_hours = np.array([td.total_seconds() / 3600 for td in time_differences])
+    data_seconds = np.array(time_differences)
 
 
     # List of distributions available in numpy.random
@@ -111,10 +124,10 @@ def best_fitting_distribution(time_differences):
     for dist_name, dist_func in numpy_distributions.items():
         try:
             # Fit the distribution to the data
-            params = dist_func.fit(data_hours)
+            params = dist_func.fit(data_seconds)
 
             # Perform the Kolmogorov-Smirnov test
-            ks_stat, _ = stats.kstest(data_hours, dist_func.cdf, args=params)
+            ks_stat, _ = stats.kstest(data_seconds, dist_func.cdf, args=params)
 
             # Track the best fit (smallest KS statistic)
             if ks_stat < best_ks:
@@ -123,26 +136,20 @@ def best_fitting_distribution(time_differences):
                 best_params = params
         except Exception as e:
             print(f"Skipping {dist_name}: {e}")
-    
 
     # Return the best-fitting distribution and its parameters
     if best_fit == "exponential":
         lambda_value = best_params[0]
-        return lambda: np.random.exponential(lambda_value)
-    elif best_fit == "normal":
-        mean, std = best_params
-        return lambda: np.random.normal(mean, std)
+        return lambda: stats.expon.rvs(scale=lambda_value)
     elif best_fit == "gamma":
         shape, loc, scale = best_params
-        return lambda: np.random.gamma(shape, scale)
+        return lambda: stats.gamma.rvs(shape, loc=loc, scale=scale)
     elif best_fit == "lognormal":
         shape, loc, scale = best_params
-        return lambda: np.random.lognormal(shape, scale)
+        return lambda: stats.lognorm.rvs(shape, loc=loc, scale=scale)
     elif best_fit == "weibull":
         c, loc, scale = best_params
-        return lambda: np.random.weibull(c)
+        return lambda: stats.weibull_min.rvs(c, loc=loc, scale=scale)
     else:
-        #time_differences = [time_differences[i] - time_differences[i - 1] for i in range(1, len(time_differences))]
         average_time = np.mean(time_differences)
-        average_time = (average_time.total_seconds())/3600
-        return lambda: np.random.uniform(0, 2*average_time)
+        return lambda: stats.uniform.rvs(loc=0, scale=2 * average_time)
