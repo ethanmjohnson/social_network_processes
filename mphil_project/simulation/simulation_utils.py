@@ -8,6 +8,7 @@ import pm4py
 from pm4py.objects.log.obj import Event, EventLog, Trace
 from pm4py.algo.conformance.tokenreplay import algorithm as token_replay
 from tqdm import tqdm
+import pandas as pd
 
 def choose_transition(transitions, user_distributions):
     # logic to choose an enabled transition to fire
@@ -153,3 +154,87 @@ def best_fitting_distribution(time_differences):
     else:
         average_time = np.mean(time_differences)
         return lambda: stats.uniform.rvs(loc=0, scale=2 * average_time)
+    
+def generate_probability_matrix(log, net, im, fm):
+    # this function generates the matrix P used to choose a transition to fire
+
+
+    transition_names = [t.label for t in net.transitions if t.label is not None]
+    # produce the frequency df
+    freq = pd.DataFrame(0, index = transition_names, columns = transition_names)
+
+    for trace in tqdm(log):
+        trace_log = EventLog()
+        trace_log.append(trace)
+        fitness = token_replay.apply(trace_log, net, im, fm)
+
+        if fitness[0]['trace_fitness'] == 1.0:
+            for i in range(len(trace)-1):
+                freq.at[trace[i]['concept:name'], trace[i+1]['concept:name']] += 1
+
+
+    row_sums = freq.sum(axis=1)
+    P = freq.div(row_sums, axis=0)
+
+    return P
+
+def generate_pdf_matrix(log, net, im, fm):
+    # this function generates the matrix F containing the pdfs associated with each transition in the petri net
+
+    transition_names = [t.label for t in net.transitions if t.label is not None]
+    
+    F = pd.DataFrame(0, index = transition_names, columns = transition_names)
+
+    time_matrix = pd.DataFrame(index = transition_names, columns = transition_names)
+    time_matrix = time_matrix.applymap(lambda x: [])
+
+    for j in tqdm(range(len(log))):
+        trace = log[j]
+        trace_log = EventLog()
+        trace_log.append(trace)
+
+        fitness = token_replay.apply(trace_log, net, im, fm)
+
+        if fitness[0]['trace_fitness'] == 1.0:
+            for i in range(1, len(trace)):
+                time_matrix.at[trace[i-1]['concept:name'], trace[i]['concept:name']].append((trace[i]['time:timestamp'] - trace[i-1]['time:timestamp']).total_seconds())
+
+
+
+    for name_row in transition_names:
+        for name_col in transition_names:
+            times = time_matrix.at[name_row, name_col]
+
+            if len(times) >= 30:
+                user_time = best_fitting_distribution(times)
+
+            elif len(times) > 1:
+                average_time = np.mean(times)
+
+                user_time = lambda: stats.uniform.rvs(loc=0, scale = 2*average_time)
+            elif len(times) == 1:
+                user_time = lambda: stats.uniform.rvs(loc = 0, scale = 2*times[0])
+            else:
+                user_time = lambda: stats.uniform.rvs(loc = 0,scale = 0)
+            
+            F.at[name_row, name_col] = user_time
+    return F
+
+
+if __name__ == "__main__":
+    from pm4py.objects.petri_net.importer import importer as pn_importer
+    from pm4py.objects.petri_net.utils import petri_utils
+    import random
+    from pm4py.objects.log.importer.xes import importer as xes_importer
+
+    # load log and net
+    variant = xes_importer.Variants.ITERPARSE
+    parameters = {variant.value.Parameters.TIMESTAMP_SORT: True}
+    log = xes_importer.apply("/Users/ethanjohnson/Desktop/mphil-project/data/processed/honduras_coordinated_log.xes", variant=variant, parameters=parameters)
+
+    net, im, fm = pn_importer.apply("/Users/ethanjohnson/Desktop/mphil-project/models/honduras_coordinated.pnml")
+
+    # P = generate_probability_matrix(log, net, im, fm)
+    # print(P)
+    F = generate_pdf_matrix(log, net, im, fm)
+    print(F.at['u1611919694', 'u977748062306217984']())
