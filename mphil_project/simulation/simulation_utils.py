@@ -10,106 +10,54 @@ from pm4py.algo.conformance.tokenreplay import algorithm as token_replay
 from tqdm import tqdm
 import pandas as pd
 
-def choose_transition(transitions, user_distributions):
+def choose_transition(transitions, P, F):
     # logic to choose an enabled transition to fire
     # Inputs:
     # transitions - list of enabled transitions
-    # user_distributions - a dictionary mapping users in the petri net to a pdf
+    # P - dictionary of probabilities
+    # F - dictionary of pdfs
+
 
     # outputs:
     # selected_transition - the chosen transition to fire
-    # transition_time - the time delay for this transition to fire
+    # selected_time - the time delay for this transition to fire
 
-    times = []
-    # randomly shuffle the transition list so there is a random chance of choosing transitions with equal time
-    random.shuffle(transitions)
+    # find the transition names 
 
-    # generate a time delay for each user
+    transition_names = [t.name for t in transitions]
 
-    for trans in transitions:
-        trans_name = trans.label
-        func = user_distributions[trans_name]
-        result = func()
-        times.append(result)
+    # create a subset of P containing relevant probabilites
 
-    # find the smallest time
+    probabilities = {k: v for k,v in P.items() if k in transition_names}
 
-    min_time = np.inf
-    for time in times:
-        if time < min_time:
-            min_time = time
+    keys = list(probabilities.keys())
+    weights = list(probabilities.values())
 
-    # find the associated transition with the smallest time
+    # select a transition using the probabilities
 
-    trans_index = times.index(min_time)
+    selected_key = random.choices(keys, weights=weights, k=1)[0]
 
-    selected_transition = transitions[trans_index]
-    transition_time = times[trans_index]
-    return (selected_transition, transition_time)
+    # find full transition object
+    for t in transitions:
+        if selected_key == t.name:
+            selected_transition = t
 
+    # find associated time
+    selected_time = F[selected_key]
 
-
-def initialise_user_times(net: pm4py.objects.petri_net.obj.PetriNet):
-    # initialise the dictionary containing the user retweet times
-    transition_names = [t.label for t in net.transitions if t.label is not None]
-    unique_names = list(set(transition_names))
-
-    times_dict = {}
-
-    for name in unique_names:
-        times_dict[name] = []
-    return times_dict
-
-def find_user_retweet_times(times_dict: dict, log: EventLog, net, im, fm):
-
-    for j in tqdm(range(len(log))):
-        trace = log[j]
-        trace_log = EventLog()
-        trace_log.append(trace)
-        # replay to find if trace is in petri net
-        fitness = token_replay.apply(trace_log, net, im, fm)
-
-        if fitness[0]['trace_fitness'] == 1.0:
-            # find the difference in times from event log if the trace exists in petri net
-            for i in range(1, len(trace)):
-                times_dict[trace[i]['concept:name']].append((trace[i]['time:timestamp'] - trace[i-1]['time:timestamp']).total_seconds())
-    
-    return times_dict
-
-def find_user_retweet_dist(times_dict: dict):
-    user_distributions = {}
-
-    for key in times_dict.keys():
-        times = times_dict[key]
-
-        if len(times) >= 30:
-            user_time = best_fitting_distribution(times)
-
-        elif len(times) > 1:
-            average_time = np.mean(times)
-
-            user_time = lambda: stats.uniform.rvs(loc=0, scale = 2*average_time)
-        elif len(times) == 1:
-            user_time = lambda: stats.uniform.rvs(loc = 0, scale = 2*times[0])
-        else:
-            user_time = lambda: stats.uniform.rvs(loc = 0,scale = 0)
-        
-        user_distributions[key] = user_time
-    # set silent transitions to a high number so they never fire unless only enabled transition
-    # this is why your code is taking 1000000 years in simulation time
-    user_distributions[None] = lambda: np.random.uniform(1000000, 1000001)
-
-    return user_distributions
-
+    return (selected_transition, selected_time())
 
 
 
 def best_fitting_distribution(time_differences):
-    # Convert time data (Timedelta) to hours
+    # given a list of time differences, finds the best fitting distribution to this list
+
+
+
     data_seconds = np.array(time_differences)
 
+    # distributions to test
 
-    # List of distributions available in numpy.random
     numpy_distributions = {
         "exponential": stats.expon,
         "gamma": stats.gamma,
@@ -121,16 +69,16 @@ def best_fitting_distribution(time_differences):
     best_params = None
     best_ks = np.inf
 
-    # Loop over each distribution
+
     for dist_name, dist_func in numpy_distributions.items():
         try:
-            # Fit the distribution to the data
+            # fit the distribution to the data
             params = dist_func.fit(data_seconds)
 
-            # Perform the Kolmogorov-Smirnov test
+
             ks_stat, _ = stats.kstest(data_seconds, dist_func.cdf, args=params)
 
-            # Track the best fit (smallest KS statistic)
+            # track the best fit (smallest KS statistic)
             if ks_stat < best_ks:
                 best_ks = ks_stat
                 best_fit = dist_name
@@ -138,7 +86,7 @@ def best_fitting_distribution(time_differences):
         except Exception as e:
             print(f"Skipping {dist_name}: {e}")
 
-    # Return the best-fitting distribution and its parameters
+    # return the best fitting distribution and its parameters
     if best_fit == "exponential":
         lambda_value = best_params[0]
         return lambda: stats.expon.rvs(scale=lambda_value)
@@ -155,86 +103,96 @@ def best_fitting_distribution(time_differences):
         average_time = np.mean(time_differences)
         return lambda: stats.uniform.rvs(loc=0, scale=2 * average_time)
     
-def generate_probability_matrix(log, net, im, fm):
+def generate_P(log, net, im, fm):
     # this function generates the matrix P used to choose a transition to fire
 
+    keys = [t.name for t in net.transitions]
 
-    transition_names = [t.label for t in net.transitions if t.label is not None]
-    # produce the frequency df
-    freq = pd.DataFrame(0, index = transition_names, columns = transition_names)
+    # initialise the frequency dict
+    freq = {key: 0 for key in keys}
+
+    for trace in tqdm(log):
+        # find fitness of trace to petri net
+        trace_log = EventLog()
+        trace_log.append(trace)
+        fitness = token_replay.apply(trace_log, net, im, fm)
+
+        if fitness[0]['trace_fitness'] == 1.0:
+            # if trace is in net, get the activated transitions required to achieve this trace in net
+            activated_transitions = fitness[0]['activated_transitions']
+
+            # update frequencies
+            for transition in activated_transitions:
+                label = transition.name
+                freq[label] += 1
+    
+
+    places = [p for p in net.places]
+
+    P = freq
+
+    for place in places:
+        outgoing_transitions = [arc.target for arc in net.arcs if arc.source == place]
+        
+        # find number of output transitions per place
+        total = 0
+        for t in outgoing_transitions:
+            total = total + freq[t.name]
+        
+        # divide freq for place by total for place
+        for t in outgoing_transitions:
+            P[t.name] = freq[t.name]/total
+
+    return P
+
+def generate_F(log, net, im, fm):
+    # this function generates the matrix F containing the pdfs associated with each transition in the petri net
+
+    label_keys = [t.label for t in net.transitions]
+
+    # initialise time differences dict
+    time_differences = {key: [] for key in label_keys}
 
     for trace in tqdm(log):
         trace_log = EventLog()
         trace_log.append(trace)
         fitness = token_replay.apply(trace_log, net, im, fm)
-
-        if fitness[0]['trace_fitness'] == 1.0:
-            for i in range(len(trace)-1):
-                freq.at[trace[i]['concept:name'], trace[i+1]['concept:name']] += 1
-
-
-    row_sums = freq.sum(axis=1)
-    P = freq.div(row_sums, axis=0)
-
-    return P
-
-def generate_pdf_matrix(log, net, im, fm):
-    # this function generates the matrix F containing the pdfs associated with each transition in the petri net
-
-    transition_names = [t.label for t in net.transitions if t.label is not None]
-    
-    F = pd.DataFrame(0, index = transition_names, columns = transition_names)
-
-    time_matrix = pd.DataFrame(index = transition_names, columns = transition_names)
-    time_matrix = time_matrix.applymap(lambda x: [])
-
-    for j in tqdm(range(len(log))):
-        trace = log[j]
-        trace_log = EventLog()
-        trace_log.append(trace)
-
-        fitness = token_replay.apply(trace_log, net, im, fm)
-
+        # find fitness, if 1, trace is in net and so all behaviour (including multiple input places per transition) is visible
         if fitness[0]['trace_fitness'] == 1.0:
             for i in range(1, len(trace)):
-                time_matrix.at[trace[i-1]['concept:name'], trace[i]['concept:name']].append((trace[i]['time:timestamp'] - trace[i-1]['time:timestamp']).total_seconds())
+                prev_event = trace[i-1]
+                curr_event = trace[i]
+                # find difference in time between events in trace
+                delta = (curr_event['time:timestamp'] - prev_event['time:timestamp']).total_seconds()
+
+                time_differences[curr_event['concept:name']].append(delta)
+
+    name_keys = [t.name for t in net.transitions]
+
+    label_time_differences = {key: [] for key in name_keys}
+
+    for t in net.transitions:
+        label_time_differences[t.name] = time_differences[t.label]
+    
+    F = {key: 0 for key in name_keys}
+    # fit distribution to each time difference list
+    for label in label_time_differences.keys():
+        times = label_time_differences[label]
+
+        # if more than 30, find a distribution
+        if len(times) >= 30:
+            user_time = best_fitting_distribution(times)
+        # otherwise use a uniform dist
+        elif len(times) > 1:
+            average_time = np.mean(times)
+
+            user_time = lambda: stats.uniform.rvs(loc=0, scale = 2*average_time)
+        elif len(times) == 1:
+            user_time = lambda: stats.uniform.rvs(loc = 0, scale = 2*times[0])
+        else:
+            user_time = lambda: stats.uniform.rvs(loc = 0,scale = 0)
+        
+        F[label] = user_time
 
 
-
-    for name_row in transition_names:
-        for name_col in transition_names:
-            times = time_matrix.at[name_row, name_col]
-
-            if len(times) >= 30:
-                user_time = best_fitting_distribution(times)
-
-            elif len(times) > 1:
-                average_time = np.mean(times)
-
-                user_time = lambda: stats.uniform.rvs(loc=0, scale = 2*average_time)
-            elif len(times) == 1:
-                user_time = lambda: stats.uniform.rvs(loc = 0, scale = 2*times[0])
-            else:
-                user_time = lambda: stats.uniform.rvs(loc = 0,scale = 0)
-            
-            F.at[name_row, name_col] = user_time
     return F
-
-
-if __name__ == "__main__":
-    from pm4py.objects.petri_net.importer import importer as pn_importer
-    from pm4py.objects.petri_net.utils import petri_utils
-    import random
-    from pm4py.objects.log.importer.xes import importer as xes_importer
-
-    # load log and net
-    variant = xes_importer.Variants.ITERPARSE
-    parameters = {variant.value.Parameters.TIMESTAMP_SORT: True}
-    log = xes_importer.apply("/Users/ethanjohnson/Desktop/mphil-project/data/processed/honduras_coordinated_log.xes", variant=variant, parameters=parameters)
-
-    net, im, fm = pn_importer.apply("/Users/ethanjohnson/Desktop/mphil-project/models/honduras_coordinated.pnml")
-
-    # P = generate_probability_matrix(log, net, im, fm)
-    # print(P)
-    F = generate_pdf_matrix(log, net, im, fm)
-    print(F.at['u1611919694', 'u977748062306217984']())
