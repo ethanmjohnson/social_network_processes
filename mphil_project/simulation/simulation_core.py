@@ -27,6 +27,10 @@ def simulate_pn_trace(net, im, fm, log, num_sims = 10):
             transition, transition_time = choose_transition(transitions, P, F)
             
             # update current time
+
+            if transition_time > 1e6:
+                transition_time = 1e6
+
             current_time = current_time + timedelta(seconds=transition_time)
 
             if transition.label != None:

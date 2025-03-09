@@ -51,13 +51,9 @@ def choose_transition(transitions, P, F):
 
 def best_fitting_distribution(time_differences):
     # given a list of time differences, finds the best fitting distribution to this list
-
-
-
     data_seconds = np.array(time_differences)
 
     # distributions to test
-
     numpy_distributions = {
         "exponential": stats.expon,
         "gamma": stats.gamma,
@@ -89,19 +85,19 @@ def best_fitting_distribution(time_differences):
     # return the best fitting distribution and its parameters
     if best_fit == "exponential":
         lambda_value = best_params[0]
-        return lambda: stats.expon.rvs(scale=lambda_value)
+        return lambda lambda_value=lambda_value: stats.expon.rvs(scale=lambda_value)
     elif best_fit == "gamma":
         shape, loc, scale = best_params
-        return lambda: stats.gamma.rvs(shape, loc=loc, scale=scale)
+        return lambda shape=shape, loc=loc, scale=scale: stats.gamma.rvs(shape, loc=loc, scale=scale)
     elif best_fit == "lognormal":
         shape, loc, scale = best_params
-        return lambda: stats.lognorm.rvs(shape, loc=loc, scale=scale)
+        return lambda shape=shape, loc=loc, scale=scale: stats.lognorm.rvs(shape, loc=loc, scale=scale)
     elif best_fit == "weibull":
         c, loc, scale = best_params
-        return lambda: stats.weibull_min.rvs(c, loc=loc, scale=scale)
+        return lambda c=c, loc=loc, scale=scale: stats.weibull_min.rvs(c, loc=loc, scale=scale)
     else:
         average_time = np.mean(time_differences)
-        return lambda: stats.uniform.rvs(loc=0, scale=2 * average_time)
+        return lambda average_time=average_time: stats.uniform.rvs(loc=0, scale=2 * average_time)
     
 def generate_P(log, net, im, fm):
     # this function generates the matrix P used to choose a transition to fire
@@ -183,12 +179,11 @@ def generate_F(log, net, im, fm):
         if len(times) >= 30:
             user_time = best_fitting_distribution(times)
         # otherwise use a uniform dist
-        elif len(times) > 1:
+        elif len(times) >= 1:
             average_time = np.mean(times)
 
-            user_time = lambda: stats.uniform.rvs(loc=0, scale = 2*average_time)
-        elif len(times) == 1:
-            user_time = lambda: stats.uniform.rvs(loc = 0, scale = 2*times[0])
+            user_time = lambda avg_time=average_time: stats.uniform.rvs(loc=0, scale = 2*avg_time)
+
         else:
             user_time = lambda: stats.uniform.rvs(loc = 0,scale = 0)
         
