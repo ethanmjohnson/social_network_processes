@@ -59,7 +59,8 @@ def best_fitting_distribution(time_differences):
         "exponential": stats.expon,
         "gamma": stats.gamma,
         "lognormal": stats.lognorm,
-        "weibull": stats.weibull_min
+        "weibull": stats.weibull_min,
+        "normal": stats.norm
     }
 
     best_fit = None
@@ -87,6 +88,9 @@ def best_fitting_distribution(time_differences):
     if best_fit == "exponential":
         lambda_value = best_params[0]
         return lambda lambda_value=lambda_value: stats.expon.rvs(scale=lambda_value)
+    elif best_fit == "normal":
+        loc, scale = best_params
+        return lambda loc=loc, scale=scale: stats.norm.rvs(loc=loc, scale=scale)
     elif best_fit == "gamma":
         shape, loc, scale = best_params
         return lambda shape=shape, loc=loc, scale=scale: stats.gamma.rvs(shape, loc=loc, scale=scale)
@@ -142,100 +146,14 @@ def generate_P(log, net, im, fm):
 
     return P
 
-def generate_F(log, net, im, fm):
-    # this function generates the matrix F containing the pdfs associated with each transition in the petri net
-
-    transition_inputs = defaultdict(set)
-
-    t = [trans for trans in net.transitions if trans.label is not None]
-
-
-    for arc in net.arcs:
-        if arc.target in t:  
-            transition_inputs[arc.target].add(arc.source)
-
-    transition_predecessors = {}
-
-    for transition, places in transition_inputs.items():
-        if len(places) > 1:  
-            previous_labels = set()
-            for place in places:
-                for arc in net.arcs:
-                    if arc.target == place and arc.source in net.transitions:
-                        if arc.source.label is not None:  
-                            previous_labels.add(arc.source.label)
-            
-            if transition.label is not None:
-                transition_predecessors[transition.label] = previous_labels
-
-    label_keys = [t.label for t in net.transitions]
-
-    # initialise time differences dict
-    time_differences = {key: [] for key in label_keys}
-
-    for trace in tqdm(log):
-        trace_log = EventLog()
-        trace_log.append(trace)
-        fitness = token_replay.apply(trace_log, net, im, fm)
-        # find fitness, if 1, trace is in net and so all behaviour (including multiple input places per transition) is visible
-        if fitness[0]['trace_fitness'] == 1.0:
-            for i in range(1, len(trace)):
-                prev_event = trace[i-1]
-                curr_event = trace[i]
-
-                if curr_event['concept:name'] in transition_predecessors.keys():
-                    concurrent_events = transition_predecessors[curr_event['concept:name']]
-                    concurrent_times = []
-                    for event in trace:
-                        if event['concept:name'] in concurrent_events:
-                            concurrent_times.append(curr_event['time:timestamp'] - event['time:timestamp']).total_seconds()
-                    
-                    max_time = max(concurrent_times)
-                    time_differences[curr_event['concept:name']].append(max_time)
-                    
-
-
-                else:
-                # find difference in time between events in trace
-                    delta = (curr_event['time:timestamp'] - prev_event['time:timestamp']).total_seconds()
-
-                    time_differences[curr_event['concept:name']].append(delta)
-
-    name_keys = [t.name for t in net.transitions]
-
-    label_time_differences = {key: [] for key in name_keys}
-
-    for t in net.transitions:
-        label_time_differences[t.name] = time_differences[t.label]
-    
-    F = {key: 0 for key in name_keys}
-    # fit distribution to each time difference list
-    for label in label_time_differences.keys():
-        times = label_time_differences[label]
-
-        # if more than 30, find a distribution
-        if len(times) >= 30:
-            user_time = best_fitting_distribution(times)
-        # otherwise use a uniform dist
-        elif len(times) >= 1:
-            average_time = np.mean(times)
-
-            user_time = lambda avg_time=average_time: stats.uniform.rvs(loc=0, scale = 2*avg_time)
-
-        else:
-            user_time = lambda: stats.uniform.rvs(loc = 0,scale = 0)
-        
-        F[label] = user_time
-
-
-    return F
-
 
 def find_previous_transitions(net, current_transition, visited_transitions=None, visited_places=None):
     if visited_transitions is None:
         visited_transitions = set()
     if visited_places is None:
         visited_places = set()
+
+    visited_transitions.add(current_transition)
     
     transition_list = []
     
@@ -260,8 +178,12 @@ def find_previous_transitions(net, current_transition, visited_transitions=None,
                 for t in input_transitions:
                     if t.label is not None:
                         synchronised_transitions.append(t)
+                    else:
+                        synchronised_transitions.extend(find_previous_transitions(net, t, visited_transitions, visited_places))
 
-            transition_list.append(synchronised_transitions)
+            flat_synchronised_transitions = [item for sublist in synchronised_transitions for item in (sublist if isinstance(sublist, list) else [sublist])]
+
+            transition_list.append(flat_synchronised_transitions)
             break
 
         # explore previous transitions
@@ -293,7 +215,7 @@ def find_previous_transitions(net, current_transition, visited_transitions=None,
     
     return transition_list
 
-def generate_new_F(net, log):
+def generate_F(net, log):
 
     transitions = [t for t in net.transitions if t.label is not None]
 
@@ -324,13 +246,12 @@ def generate_new_F(net, log):
             else: # if multiple possible transitions (synchronised events), search log and add the minimum time delay
 
                 t_list_names = [t.label for t in t_list]
-                all_event_names = t_list_names + [key.label]
                 for trace in log:
                     trace_event_names = {event['concept:name'] for event in trace}
                     timestamp_b = None
                     timestamp_a = None
 
-                    if all(t_list_name in trace_event_names for t_list_name in all_event_names):
+                    if any(t_list_name in trace_event_names for t_list_name in t_list_names) and key.label in trace_event_names:
                         for event in trace:
                             if event['concept:name'] == key.label:
                                 timestamp_b = event['time:timestamp']
@@ -339,13 +260,13 @@ def generate_new_F(net, log):
                             if event['concept:name'] in t_list_names:
                                 timestamp_a = event['time:timestamp']
                                 delta = (timestamp_b - timestamp_a).total_seconds()
+
                                 if delta < delay_time_single and delta >= 0:
                                     delay_time_single = delta
-                        delay_time.append(delay_time_single)
-            
+                        if delay_time_single != np.inf:
+                            delay_time.append(delay_time_single)
+        
         delay_time_dict[key] = delay_time
-
-
 
     name_keys = [t.name for t in net.transitions]
 

@@ -28,8 +28,11 @@ def simulate_pn_trace(net, im, fm, log, num_sims = 10):
             
             # update current time
 
-            if transition_time > 1e6:
-                transition_time = 1e6
+            if transition_time > 1e8:
+                transition_time = 1e8
+            
+            if transition_time < 0.0:
+                transition_time = 0.0
 
             current_time = current_time + timedelta(seconds=transition_time)
 
@@ -47,5 +50,3 @@ def simulate_pn_trace(net, im, fm, log, num_sims = 10):
         sim_log.append(trace)
 
     return sim_log
-
-    
