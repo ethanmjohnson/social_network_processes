@@ -109,17 +109,14 @@ if __name__ == "__main__":
 
     import pm4py
     import pandas as pd
-    from pathlib import Path
-    from pm4py.visualization.petri_net import visualizer as pn_viz
-    from tqdm import tqdm
     import os
 
-
-    folder_path = Path(__file__).parent.parent.parent / "data/external/brazil_elections-2018"
+    print("collecting files...")
+    folder_path = "brazil_elections-2018"
 
     dataframes = []
 
-    for filename in tqdm(os.listdir(folder_path)):
+    for filename in os.listdir(folder_path):
         if filename.endswith(".csv"):
             file_path = os.path.join(folder_path, filename)
             df = pd.read_csv(file_path)
@@ -128,35 +125,30 @@ if __name__ == "__main__":
 
     data = pd.concat(dataframes, ignore_index=True)
 
-    good_log, bad_log = create_brazil_event_logs(data, 30, 100)
+    good_log, bad_log = create_brazil_event_logs(data, 5, 500)
 
-    pm4py.write_xes(good_log, Path(__file__).parent.parent.parent / "data/processed/brazil_uncoordinated_log.xes")
-    pm4py.write_xes(bad_log, Path(__file__).parent.parent.parent / "data/processed/brazil_coordinated_log.xes")
+    pm4py.write_xes(good_log, "brazil_uncoordinated_log.xes")
+    pm4py.write_xes(bad_log, "brazil_coordinated_log.xes")
 
     print("discovering uncoordinated Petri net...")
-    net, im, fm = pm4py.discover_petri_net_inductive(good_log, noise_threshold=0.2)
+    net, im, fm = pm4py.discover_petri_net_inductive(good_log, noise_threshold=0.2, multi_processing=True)
 
     print("saving uncoordinated Petri net...")
-    pm4py.write_pnml(net, im, fm, str(Path(__file__).parent.parent.parent / "models/brazil_uncoordinated.pnml"))
-
-    # visualise pn
-    print("visualising uncoordinated...")
-    gviz = pn_viz.apply(net, im, fm)
-
-    # save pn image
-
-    pn_viz.save(gviz, Path(__file__).parent.parent.parent / "figures/brazil_uncoordinated.png")
+    pm4py.write_pnml(net, im, fm, "brazil_uncoordinated.pnml")
 
     print("discovering coordinated Petri net...")
-    net, im, fm = pm4py.discover_petri_net_inductive(bad_log, noise_threshold=0.2)
+    net, im, fm = pm4py.discover_petri_net_inductive(bad_log, noise_threshold=0.2, multi_processing=True)
 
     print("saving coordinated Petri net...")
-    pm4py.write_pnml(net, im, fm, str(Path(__file__).parent.parent.parent / "models/brazil_coordinated.pnml"))
+    pm4py.write_pnml(net, im, fm, "brazil_coordinated.pnml")
 
-    # visualise pn
-    print("visualising coordinated...")
-    gviz = pn_viz.apply(net, im, fm)
 
-    # save pn image
+    pm4py.save_vis_petri_net()
 
-    pn_viz.save(gviz, Path(__file__).parent.parent.parent / "figures/brazil_coordinated.png")
+    # # visualise pn
+    # print("visualising coordinated...")
+    # gviz = pn_viz.apply(net, im, fm)
+
+    # # save pn image
+
+    # pn_viz.save(gviz, Path(__file__).parent.parent.parent / "figures/brazil_coordinated.png")

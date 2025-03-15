@@ -1,4 +1,4 @@
-def create_honduras_uncoord_event_log(data, trim_length, log_length):
+def create_event_log(data, trim_length, log_length):
     """
     This function converts a jsonlines file to an EventLog. 
 
@@ -13,6 +13,9 @@ def create_honduras_uncoord_event_log(data, trim_length, log_length):
     from pm4py.objects.conversion.log import converter as log_converter
     from pm4py.filtering import filter_case_size
     from pm4py.objects.log.obj import EventLog, Trace
+    from datetime import datetime, timedelta
+    from pm4py.algo.filtering.log.timestamp.timestamp_filter import apply_events as time_filter
+
 
     df = []
 
@@ -35,12 +38,10 @@ def create_honduras_uncoord_event_log(data, trim_length, log_length):
     cols = ['time:timestamp', 'concept:name', 'case:concept:name']
     df.columns = cols
 
-    # filters traces that only contain a single event
-    length_df = df.groupby('case:concept:name').filter(lambda x: len(x) >= 2)
-    # convert df to log
-    log = log_converter.apply(length_df, variant=log_converter.Variants.TO_EVENT_LOG)
 
-    # trim each trace of log to length n
+    # convert df to log
+    log = log_converter.apply(df, variant=log_converter.Variants.TO_EVENT_LOG)
+
 
     trimmed_log = EventLog()
 
@@ -63,40 +64,26 @@ def create_honduras_uncoord_event_log(data, trim_length, log_length):
         short_log.append(filtered_log[i])
 
     return short_log
- 
-
 
 
 if __name__ == "__main__":
     import pm4py
     import pandas as pd
-    from pathlib import Path
-    from pm4py.visualization.petri_net import visualizer as pn_viz
+
 
     print("create log...")
 
-    path = Path(__file__).parent.parent.parent / "data/external/honduras-good-anonymized"
+    path = "honduras-bad-anonymized"
 
     data = pd.read_json(path, lines = True)
 
-    log = create_honduras_uncoord_event_log(data, 30, 100)
+    log = create_event_log(data, 5, 500)
 
-    pm4py.write_xes(log, Path(__file__).parent.parent.parent / "data/processed/honduras_uncoordinated_log.xes")
+    pm4py.write_xes(log, "honduras_coordinated_log.xes")
 
     print("discovering Petri net...")
-    net, im, fm = pm4py.discover_petri_net_inductive(log, noise_threshold=0.2)
+    net, im, fm = pm4py.discover_petri_net_inductive(log, noise_threshold=0.2, multi_processing=True)
 
 
     print("saving Petri net...")
-    pm4py.write_pnml(net, im, fm, str(Path(__file__).parent.parent.parent / "models/honduras_uncoordinated.pnml"))
-
-    # visualise pn
-    print("visualising...")
-    gviz = pn_viz.apply(net, im, fm)
-
-    # save pn image
-
-    pn_viz.save(gviz, Path(__file__).parent.parent.parent / "figures/honduras_uncoordinated.png")
-
-
-
+    pm4py.write_pnml(net, im, fm, "honduras_coordinated.pnml")
