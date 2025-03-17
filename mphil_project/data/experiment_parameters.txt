@@ -1,7 +1,0 @@
-trace trim length, number of traces
-
-honduras 10, 400
-uae 10, 300
-brazil 10, 200
-
-
