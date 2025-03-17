@@ -1,6 +1,6 @@
 def create_event_log(data, trim_length, log_length):
     """
-    This function converts a jsonlines file to an EventLog. 
+    This function converts a jsonlines file to an EventLog for the Honduras and UAE datasets. 
 
     Inputs:
     data: jsonlines file to convert
@@ -73,17 +73,19 @@ if __name__ == "__main__":
 
     print("create log...")
 
+    # add path to one of Honduras/UAE coordinated/uncoordinated jsonl file
     path = "honduras-bad-anonymized"
 
     data = pd.read_json(path, lines = True)
 
     log = create_event_log(data, 5, 500)
 
+    # add path to output for each log
     pm4py.write_xes(log, "honduras_coordinated_log.xes")
 
     print("discovering Petri net...")
     net, im, fm = pm4py.discover_petri_net_inductive(log, noise_threshold=0.2, multi_processing=True)
 
-
+    # add path to output for each Petri net
     print("saving Petri net...")
     pm4py.write_pnml(net, im, fm, "honduras_coordinated.pnml")

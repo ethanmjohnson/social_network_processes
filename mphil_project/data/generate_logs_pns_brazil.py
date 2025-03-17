@@ -1,5 +1,18 @@
 def create_brazil_event_logs(data, trim_length, log_length):
 
+    """
+    This function converts a jsonlines file to an EventLog for the Brazil datasets. 
+
+    Inputs:
+    data: jsonlines file to convert
+    trim_length: length to trim each trace to
+    log_length: desired length of returned log
+
+    Outputs:
+    good_short_log: an event log for the uncoordinated users
+    bad_short_log: an event log for the coordinated users
+    """
+
     from pm4py.objects.conversion.log import converter as log_converter
     from pm4py.filtering import filter_case_size
     from pm4py.objects.log.obj import EventLog, Trace
@@ -112,6 +125,7 @@ if __name__ == "__main__":
     import os
 
     print("collecting files...")
+    # add path to the folder containing the 2018 Brazil election data
     folder_path = "brazil_elections-2018"
 
     dataframes = []
@@ -127,28 +141,20 @@ if __name__ == "__main__":
 
     good_log, bad_log = create_brazil_event_logs(data, 5, 500)
 
+    # add output path for uncoordinated and coordinated logs
     pm4py.write_xes(good_log, "brazil_uncoordinated_log.xes")
     pm4py.write_xes(bad_log, "brazil_coordinated_log.xes")
 
     print("discovering uncoordinated Petri net...")
     net, im, fm = pm4py.discover_petri_net_inductive(good_log, noise_threshold=0.2, multi_processing=True)
 
+    # add output path to uncoordinated Petri net
     print("saving uncoordinated Petri net...")
     pm4py.write_pnml(net, im, fm, "brazil_uncoordinated.pnml")
 
     print("discovering coordinated Petri net...")
     net, im, fm = pm4py.discover_petri_net_inductive(bad_log, noise_threshold=0.2, multi_processing=True)
 
+    # add output path to coordinated Petri net
     print("saving coordinated Petri net...")
     pm4py.write_pnml(net, im, fm, "brazil_coordinated.pnml")
-
-
-    pm4py.save_vis_petri_net()
-
-    # # visualise pn
-    # print("visualising coordinated...")
-    # gviz = pn_viz.apply(net, im, fm)
-
-    # # save pn image
-
-    # pn_viz.save(gviz, Path(__file__).parent.parent.parent / "figures/brazil_coordinated.png")

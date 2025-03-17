@@ -5,7 +5,19 @@ from simulation_utils import choose_transition, generate_F, generate_P
 
 
 def simulate_pn_trace(net, im, fm, log, num_sims = 10):
-    # this function runs the simulation of a stochastic petri net
+    """
+    Simulates num_sims traces of a free-choice Stochastic Petri net
+
+    Inputs:
+    net: the Petri net
+    im: the initial marking of a Petri net
+    fm: the final marking of a Petri net
+    log: the event log the Petri net was discovered from
+    num_sims: (default = 10) the number of traces to simulate from the free-choice Stochastic Petri net
+
+    Outputs:
+    sim_log: the simulated event log from the free-choice Stochastic Petri net containing num_sims traces
+    """
 
     # generate the probability and pdf arrays
     F = generate_F(log, net, im, fm)

@@ -12,16 +12,20 @@ import pandas as pd
 from collections import defaultdict
 
 def choose_transition(transitions, P, F):
-    # logic to choose an enabled transition to fire
-    # Inputs:
-    # transitions - list of enabled transitions
-    # P - dictionary of probabilities
-    # F - dictionary of pdfs
+
+    """
+    logic to choose an enabled transition to fire
+    Inputs:
+    transitions - list of enabled transitions
+    P - dictionary of probabilities
+    F - dictionary of pdfs
 
 
-    # outputs:
-    # selected_transition - the chosen transition to fire
-    # selected_time - the time delay for this transition to fire
+    outputs:
+    selected_transition - the chosen transition to fire
+    selected_time - the time delay for this transition to fire
+    """
+
 
     # find the transition names 
 
@@ -52,6 +56,7 @@ def choose_transition(transitions, P, F):
 
 def best_fitting_distribution(time_differences):
     # given a list of time differences, finds the best fitting distribution to this list
+
     data_seconds = np.array(time_differences)
 
     # distributions to test
@@ -106,6 +111,18 @@ def best_fitting_distribution(time_differences):
     
 def generate_P(log, net, im, fm):
     # this function generates the matrix P used to choose a transition to fire
+    """
+    Generates the dictionary P containing probabilities of transitioning to some transition
+
+    Inputs:
+    log: the event log
+    net: the Petri net discovered from the event log
+    im: the initial marking
+    fm: the final marking
+
+    Outputs:
+    P: the dictionary containing transition probabilities
+    """
 
     keys = [t.name for t in net.transitions]
 
@@ -148,6 +165,16 @@ def generate_P(log, net, im, fm):
 
 
 def find_previous_transitions(net, current_transition, visited_transitions=None, visited_places=None):
+    """
+    Finds the previous possible non-silent transitions from some starting transition
+
+    Inputs:
+    net: a Petri net
+    current_transition: the transition to find all previous transitions from
+
+    Outputs:
+    transition_list: a list of previous possible transitions
+    """
     if visited_transitions is None:
         visited_transitions = set()
     if visited_places is None:
@@ -216,6 +243,16 @@ def find_previous_transitions(net, current_transition, visited_transitions=None,
     return transition_list
 
 def generate_F(net, log):
+    """
+    Finds a dictionary of pdfs associated with each transitions in the net
+
+    Inputs:
+    net: the Petri net
+    log: the event log the Petri net was discovered from
+
+    Outputs:
+    F: a dictionary containing pdfs for each key (transition in the Petri net)
+    """
 
     transitions = [t for t in net.transitions if t.label is not None]
 
