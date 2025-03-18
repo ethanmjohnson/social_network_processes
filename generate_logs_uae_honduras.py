@@ -50,6 +50,7 @@ def create_event_log(file_path, trim_length, log_length):
     for trace in log:
         if len(trace) > trim_length:
             trimmed_trace = Trace()
+            trimmed_trace.attributes.update(trace.attributes)
             for i in range(trim_length):
                 trimmed_trace.append(trace[i])
             trimmed_log.append(trimmed_trace)
@@ -65,22 +66,40 @@ def create_event_log(file_path, trim_length, log_length):
     for i in range(log_length):
         short_log.append(filtered_log[i])
 
-    # find output path name
+    return short_log
 
-    if "honduras" in file_path:
-        split_path = file_path.split(sep="honduras")
-        if "bad" in file_path:
-            output_path = split_path[0] + "honduras_coordinated.xes"
-        else:
-            output_path = split_path[0] + "honduras_uncoordinated.xes"
-    else:
-        split_path = file_path.split(sep="uae")
-        if "bad" in file_path:
-            output_path = split_path[0] + "uae_coordinated.xes"
-        else:
-            output_path = split_path[0] + "uae_uncoordinated.xes"
-    
-    # save event log to output path
-    print("saving event log...")
-    pm4py.write_xes(short_log, output_path)
 
+if __name__ == "__main__":
+    from load_config import load_config
+    import os
+    import argparse
+    import pm4py
+
+    config = load_config()
+
+    parser = argparse.ArgumentParser(description="Run script on a dataset.")
+    parser.add_argument("--dataset", type=str, required=True, help="Dataset filename (relative to project root)")
+    args = parser.parse_args()
+
+    # Construct dataset path
+    dataset_path = os.path.join(config["project_root"], "data", args.dataset)
+
+    if not os.path.exists(dataset_path):
+        raise FileNotFoundError(f"Dataset not found: {dataset_path}")
+
+    if args.dataset == "honduras-bad-anonymized":
+        output_path = os.path.join(config["project_root"], "data/honduras_coordinated.xes")
+        log_length = 400
+    elif args.dataset == "honduras-good-anonymized":
+        output_path = os.path.join(config["project_root"], "data/honduras_uncoordinated.xes")
+        log_length = 400
+    elif args.dataset == "uae-bad-anonymized":
+        output_path = os.path.join(config["project_root"], "data/uae_coordinated.xes")
+        log_length = 300
+    elif args.dataset == "uae-good-anonymized":
+        output_path = os.path.join(config["project_root"], "data/uae_uncoordinated.xes")
+        log_length = 300
+
+    log = create_event_log(dataset_path, 10, log_length=log_length)
+
+    pm4py.write_xes(log, output_path)

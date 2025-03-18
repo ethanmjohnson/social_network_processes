@@ -41,36 +41,21 @@ def find_petri_net_diameter(file_path):
         for target in lengths[source]:
             diameter = max(diameter, lengths[source][target])
 
-    print("Diameter: ", diameter)
-
     return diameter
 
+if __name__ == "__main__":
+    from load_config import load_config
+    import os
+    import argparse
 
-def find_petri_net_density(file_path):
-    """
-    This function finds the density of a given petri net using the density for a directed graph.
+    config = load_config()
 
-    Inputs:
-    file_path: the path to a Petri net
+    parser = argparse.ArgumentParser(description="Run script on a Petri net.")
+    parser.add_argument("--pn", type=str, required=True, help="Petri net filename (relative to project root)")
+    args = parser.parse_args()
 
-    Outputs:
-    density: the density as a float
-    """
+    # Construct dataset path
+    file_path = os.path.join(config["project_root"], "data", args.pn)
 
-    import pm4py
-
-    net, im, fm = pm4py.read_pnml(file_path)
-
-    # calculate the total number of nodes
-    no_nodes = len(net.transitions) + len(net.places)
-    print('nodes: ', no_nodes)
-
-    # calculate the number of edges
-    no_edges = len(net.arcs)
-
-    # calculate the density using the density of a directed graph
-    density = no_edges/(no_nodes*(no_nodes - 1))
-
-    print("Density: ", density)
-
-    return density
+    diameter = find_petri_net_diameter(file_path)
+    print("Diameter of", args.pn, ": ", diameter)

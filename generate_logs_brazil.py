@@ -1,4 +1,4 @@
-def create_brazil_event_logs(folder_path, trim_length, log_length):
+def create_brazil_event_logs(project_root, trim_length, log_length):
 
     """
     This function converts a jsonlines file to an EventLog for the Brazil datasets. 
@@ -9,8 +9,8 @@ def create_brazil_event_logs(folder_path, trim_length, log_length):
     log_length: desired length of returned log
 
     Outputs:
-    good_short_log: an event log for the uncoordinated users
-    bad_short_log: an event log for the coordinated users
+    brazil_1_short_log: an event log for the users with a bot score of >= 0.9
+    brazil_2_short_log: an event log for the users with a bot score of <= 0.1
     """
     import pm4py
     from pm4py.objects.conversion.log import converter as log_converter
@@ -20,7 +20,8 @@ def create_brazil_event_logs(folder_path, trim_length, log_length):
     import pandas as pd
 
     print("collecting files...")
-    # add path to the folder containing the 2018 Brazil election data
+
+    folder_path = os.path.join(project_root, "data/brazil_elections-2018")
 
     dataframes = []
 
@@ -52,18 +53,18 @@ def create_brazil_event_logs(folder_path, trim_length, log_length):
     df = df[df['userid'].isnull() == False]
 
     # split dataset using botscore - coordinated if botscore is >= 0.9 and uncoordinated if <= 0.1
-    bad_df = df[df['botscore'] >= 0.9]
-    good_df = df[df['botscore'] <= 0.1]
+    brazil_1_df = df[df['botscore'] >= 0.9]
+    brazil_2_df = df[df['botscore'] <= 0.1]
 
 
-    bad_df = bad_df.loc[:, ['retweet_tweetid', 'userid', 'tweet_time']]
-    good_df = good_df.loc[:, ['retweet_tweetid', 'userid', 'tweet_time']]
+    brazil_1_df = brazil_1_df.loc[:, ['retweet_tweetid', 'userid', 'tweet_time']]
+    brazil_2_df = brazil_2_df.loc[:, ['retweet_tweetid', 'userid', 'tweet_time']]
 
     cols = ['case:concept:name', 'concept:name', 'time:timestamp']
-    bad_df.columns = cols
-    good_df.columns = cols
+    brazil_1_df.columns = cols
+    brazil_2_df.columns = cols
 
-    selected_df = good_df
+    selected_df = brazil_2_df
 
     idx = selected_df.groupby(['case:concept:name', 'concept:name'])['time:timestamp'].idxmin()
     earliest_events_df = selected_df.loc[idx].reset_index(drop=True)
@@ -72,33 +73,33 @@ def create_brazil_event_logs(folder_path, trim_length, log_length):
     length_df = earliest_events_df.groupby('case:concept:name').filter(lambda x: len(x) >= 2)
 
 
-    good_log = log_converter.apply(length_df, variant=log_converter.Variants.TO_EVENT_LOG)
+    brazil_2_log = log_converter.apply(length_df, variant=log_converter.Variants.TO_EVENT_LOG)
 
     # trim each trace of log to length n
 
-    good_trimmed_log = EventLog()
+    brazil_2_trimmed_log = EventLog()
 
-    for trace in good_log:
+    for trace in brazil_2_log:
         if len(trace) > trim_length:
             trimmed_trace = Trace()
             for i in range(trim_length):
                 trimmed_trace.append(trace[i])
-            good_trimmed_log.append(trimmed_trace)
+            brazil_2_trimmed_log.append(trimmed_trace)
         else:
-            good_trimmed_log.append(trace)
+            brazil_2_trimmed_log.append(trace)
 
     # remove traces of length 1
-    filtered_log = filter_case_size(good_trimmed_log, 2, 1e6)
+    brazil_2_filtered_log = filter_case_size(brazil_2_trimmed_log, 2, 1e6)
 
     # select the first x traces
-    good_short_log = EventLog()
+    brazil_2_short_log = EventLog()
 
     for i in range(log_length):
-        good_short_log.append(filtered_log[i])
+        brazil_2_short_log.append(brazil_2_filtered_log[i])
 
 
     
-    selected_df = bad_df
+    selected_df = brazil_1_df
 
     idx = selected_df.groupby(['case:concept:name', 'concept:name'])['time:timestamp'].idxmin()
     earliest_events_df = selected_df.loc[idx].reset_index(drop=True)
@@ -107,32 +108,43 @@ def create_brazil_event_logs(folder_path, trim_length, log_length):
     length_df = earliest_events_df.groupby('case:concept:name').filter(lambda x: len(x) >= 2)
 
 
-    bad_log = log_converter.apply(length_df, variant=log_converter.Variants.TO_EVENT_LOG)
+    brazil_1_log = log_converter.apply(length_df, variant=log_converter.Variants.TO_EVENT_LOG)
 
     # trim each trace of log to length n
 
-    bad_trimmed_log = EventLog()
+    brazil_1_trimmed_log = EventLog()
 
-    for trace in bad_log:
+    for trace in brazil_1_log:
         if len(trace) > trim_length:
             trimmed_trace = Trace()
+            trimmed_trace.attributes.update(trace.attributes)
             for i in range(trim_length):
                 trimmed_trace.append(trace[i])
-            bad_trimmed_log.append(trimmed_trace)
+            brazil_1_trimmed_log.append(trimmed_trace)
         else:
-            bad_trimmed_log.append(trace)
+            brazil_1_trimmed_log.append(trace)
 
     # remove traces of length 1
-    filtered_log = filter_case_size(bad_trimmed_log, 2, 1e6)
+    brazil_1_filtered_log = filter_case_size(brazil_1_trimmed_log, 2, 1e6)
 
     # select the first x traces
-    bad_short_log = EventLog()
+    brazil_1_short_log = EventLog()
 
     for i in range(log_length):
-        bad_short_log.append(filtered_log[i])
+        brazil_1_short_log.append(brazil_1_filtered_log[i])
 
-    output_path = folder_path.split(sep="brazil")[0]
 
-    pm4py.write_xes(good_log, output_path + "brazil_uncoordinated.xes")
-    pm4py.write_xes(bad_log, output_path + "brazil_coordinated.xes")
+    pm4py.write_xes(brazil_2_short_log, os.path.join(project_root, "data/brazil_2.xes"))
+    pm4py.write_xes(brazil_1_short_log, os.path.join(project_root, "data/brazil_1.xes"))
 
+if __name__ == "__main__":
+    from load_config import load_config
+
+    config = load_config()
+
+    project_root = config['project_root']
+
+    create_brazil_event_logs(project_root, 10, 200)
+
+
+    
