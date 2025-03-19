@@ -7,6 +7,19 @@ from scipy.stats import ks_2samp
 
 
 def calculate_mean_waiting_times(c_input_file, u_input_file):
+
+    """
+    This function calculates the mean waiting times for an uncoordinated and coordinated dataset using the event log and Petri net.
+
+    Inputs:
+    c_input_file - the input path for the coordinated dataset
+    u_input_file - the input path for the uncoordianted dataset
+
+    Outputs:
+    mean_timesc - the mean time differences for the coordinated data
+    mean_timesu - the mean time differences for the uncoordinated data
+    """
+
     netc, initial_markingc, final_markingc = pm4py.read_pnml(c_input_file + ".pnml")
     variant = xes_importer.Variants.ITERPARSE
     parameters = {variant.value.Parameters.TIMESTAMP_SORT: True}
