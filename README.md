@@ -7,7 +7,7 @@ This repository contains code for discovering and analyzing free-choice Stochast
 -[Introduction](#introduction)\
 -[Project Structure](#project-structure)\
 -[Reproducibility](#reproducibility)\
--[Usage](#usage)\
+-[Usage](#usage)
 
 ## Introduction
 

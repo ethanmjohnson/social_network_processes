@@ -29,7 +29,7 @@ if __name__ == "__main__":
     config = load_config()
 
     parser = argparse.ArgumentParser(description="Discover Petri net from event log.")
-    parser.add_argument("--log", type=str, required=True, help="Event log filename (relative to project root)")
+    parser.add_argument("--log", type=str, required=True, choices=["brazil_1.xes", "brazil_2.xes", "honduras_coordinated.xes", "honduras_uncoordinated.xes", "uae_coordinated.xes", "uae_uncoordinated.xes"], help="Event log filename (relative to project root)")
     args = parser.parse_args()
 
     # Construct dataset path

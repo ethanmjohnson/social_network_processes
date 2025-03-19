@@ -78,7 +78,7 @@ if __name__ == "__main__":
     config = load_config()
 
     parser = argparse.ArgumentParser(description="Run script on a dataset.")
-    parser.add_argument("--dataset", type=str, required=True, help="Dataset filename (relative to project root)")
+    parser.add_argument("--dataset", type=str, required=True, choices=["uae-good-anonymized", "uae-bad-anonymized", "honduras-good-anonymized", "honduras-bad-anonymized"], help="Dataset filename (relative to project root)")
     args = parser.parse_args()
 
     # Construct dataset path

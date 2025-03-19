@@ -32,7 +32,7 @@ if __name__ == "__main__":
     config = load_config()
 
     parser = argparse.ArgumentParser(description="Run script on a Petri net.")
-    parser.add_argument("--pn", type=str, required=True, help="Petri net filename (relative to project root)")
+    parser.add_argument("--pn", type=str, required=True, choices=["brazil_1.pnml", "brazil_2.pnml", "honduras_coordinated.pnml", "honduras_uncoordinated.pnml", "uae_coordinated.pnml", "uae_uncoordinated.pnml"], help="Petri net filename (relative to project root)")
     args = parser.parse_args()
 
     # Construct dataset path

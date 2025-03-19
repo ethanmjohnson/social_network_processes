@@ -8,14 +8,13 @@ raw_data
 processed_data
 figs
 Pipfile.lock
-*.xes
 *.png
 __pycache__
 unused_code
-/data/
 /code/
 /tests/
 /notebooks/
 /models/
 /mphil_project/config.py
 /mphil_project/__init__.py
+/venv/
