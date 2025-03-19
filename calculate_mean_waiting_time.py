@@ -5,8 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import ks_2samp
 
-# add argument for country, if country is brazil get brazil_1, brazil_2 etc.
-
 
 def calculate_mean_waiting_times(c_input_file, u_input_file):
     netc, initial_markingc, final_markingc = pm4py.read_pnml(c_input_file + ".pnml")

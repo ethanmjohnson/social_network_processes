@@ -1,6 +1,4 @@
 import numpy as np
-import scipy.stats as stats
-import random
 from pm4py.objects.log.obj import EventLog
 from pm4py.algo.conformance.tokenreplay import algorithm as token_replay
 from tqdm import tqdm

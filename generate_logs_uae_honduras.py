@@ -13,7 +13,6 @@ def create_event_log(file_path, trim_length, log_length):
     from pm4py.objects.conversion.log import converter as log_converter
     from pm4py.filtering import filter_case_size
     from pm4py.objects.log.obj import EventLog, Trace
-    import pm4py
     import pandas as pd
 
     print("reading in data...")
