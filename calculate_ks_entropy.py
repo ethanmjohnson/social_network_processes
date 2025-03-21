@@ -3,6 +3,17 @@ from free_choice_SPN import generate_P
 from pm4py.objects.log.importer.xes import importer as xes_importer
 import numpy as np
 
+# Because a free-choice stochastic Petri net cannot be precisely represented as a Markov chain, its behavior can be approximated using a reachability graph. 
+# This graph can be constructed by replaying the event log on the Petri net. 
+# Each state in the graph corresponds to a pair: (i) the current marking of the Petri net, and (ii) the place(s) that will provide tokens to the next firing transition.
+# In this reachability graph, the sum of stationary probabilities for the states associated with the 
+# same place is proportional to the frequency of that place's activation in the event log. 
+# Since probabilistic choices (i.e., choices with probabilities less than 1) in free-choice nets occur only at specific “choice” places (*), 
+# the Kolmogorov–Sinai entropy can be calculated based solely on these places, their activation frequencies, and the probabilities of their outgoing transitions. 
+# These probabilities can be generalized and aggregated for each place based on the event log data.
+#
+# (*) States with outgoing transitions of probability 1 make no contribution to the Kolmogorov–Sinai entropy, by definition.
+
 
 def get_preceding_places(petri_net, transition):
     """
