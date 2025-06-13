@@ -1,6 +1,6 @@
-# Processes in Social Networks: A Framework for Exploring Online User Behavior
+# Discovering Coordinated Processes From Social Online Networks
 
-This repository contains code for discovering and analyzing free-choice Stochastic Petri nets, as presented in our paper titled "Processes in Social Networks: A Framework for Exploring Online User Behavior".
+This repository contains code for discovering and analyzing free-choice Stochastic Petri nets, as presented in our paper titled "Discovering Coordinated Processes From Social Online Networks".
 
 ## Table of Contents
 
