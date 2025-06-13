@@ -26,7 +26,8 @@ The project is structured as follows:
 social_network_processes/
 │
 ├── data/                       # Folder containing the event logs and Petri net models discovered 
-├── calculate_density.py     # The 'calculate' scripts contain functions for the case studies section
+├── calculate_constructs.py     # The 'calculate' scripts contain functions for the case studies section
+├── calculate_density.py     
 ├── calculate_diameter.py
 ├── calculate_ks_entropy.py
 ├── calculate_mean_waiting_time.py 
