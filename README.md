@@ -55,6 +55,7 @@ To obtain the results from our paper, follow these steps.
 7. Use `calculate_density.py` to calculate the density of the Petri nets.
 8. Use `calculate_ks_entropy.py` to calculate the KS entropy.
 9. Use `calculate_mean_waiting_time.py` to generate a plot comparing the mean waiting time for uncoordinated and coordinated datasets.
+10. Use `calculate_constructs.py` to calculate the number of XOR and AND gates from the discovered process trees.
 
 
 ## Usage
